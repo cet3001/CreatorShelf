@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
@@ -127,170 +128,187 @@ export default function SparkCodesScreen() {
     );
   }
 
+  const listHeader = (
+    <View className="mb-6">
+      <Text className="mb-2 text-2xl font-bold">SparkCodes</Text>
+      <Text className="mb-4 text-muted-foreground">
+        Track Spark codes, video links, and brand status.
+      </Text>
+      <Text className="mb-2 text-lg font-semibold">Spark codes</Text>
+      {isLoading && (
+        <View className="py-8">
+          <ActivityIndicator size="small" />
+        </View>
+      )}
+      {error && (
+        <View className="py-4">
+          <ListErrorBanner message={toHumanMessage(error)} retryHint="Pull to retry." />
+        </View>
+      )}
+      {!isLoading && !error && codes.length === 0 && (
+        <EmptyState message="No Spark codes yet. Add one below." />
+      )}
+    </View>
+  );
+
+  const listFooter = (
+    <View className="mb-4">
+      <Text className="mb-2 text-lg font-semibold">Add Spark code</Text>
+      <form.Field
+        name="code"
+        children={field => (
+          <Input
+            label="Code"
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChangeText={field.handleChange}
+            error={getFieldError(field)}
+            placeholder="Spark code"
+          />
+        )}
+      />
+      <form.Field
+        name="video_url"
+        children={field => (
+          <Input
+            label="Video URL (optional)"
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChangeText={field.handleChange}
+            error={getFieldError(field)}
+            placeholder="https://..."
+          />
+        )}
+      />
+      <form.Field
+        name="brand_name"
+        children={field => (
+          <Input
+            label="Brand (optional)"
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChangeText={field.handleChange}
+            error={getFieldError(field)}
+          />
+        )}
+      />
+      <form.Field
+        name="status"
+        children={field => (
+          <Select
+            label="Status"
+            options={SPARK_STATUS_OPTIONS}
+            value={field.state.value}
+            onSelect={v => field.handleChange(() => String(v) as 'draft' | 'sent_to_brand' | 'active' | 'expired')}
+            error={getFieldError(field)}
+            placeholder="Select status"
+          />
+        )}
+      />
+      <form.Field
+        name="expires_at"
+        children={field => (
+          <Input
+            label="Expires at (optional)"
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChangeText={field.handleChange}
+            error={getFieldError(field)}
+            placeholder="YYYY-MM-DD or ISO"
+          />
+        )}
+      />
+      <form.Field
+        name="note"
+        children={field => (
+          <Input
+            label="Note (optional)"
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChangeText={field.handleChange}
+            error={getFieldError(field)}
+          />
+        )}
+      />
+      <form.Subscribe
+        selector={state => [state.isSubmitting]}
+        children={([isSubmitting]) => (
+          <Button
+            label="Add Spark code"
+            variant="secondary"
+            onPress={form.handleSubmit}
+            loading={isSubmitting || mutation.isPending}
+          />
+        )}
+      />
+      {mutation.isError && !(mutation.error instanceof SupabaseNotConfiguredError) && !(mutation.error instanceof AuthRequiredError) && (
+        <Text className="mt-2 text-sm text-danger-600">
+          {toHumanMessage(mutation.error)}
+        </Text>
+      )}
+    </View>
+  );
+
+  const renderItem = ({ item }: { item: typeof codes[number] }) => {
+    const expired = item.expires_at ? isExpired(item.expires_at) : false;
+    const isActive = item.status === 'active' && !expired;
+    return (
+      <View className="mb-2 rounded-2xl border border-neutral-200/80 bg-white/95 p-3 dark:border-neutral-600/50 dark:bg-neutral-800/95">
+        <View className="flex-row flex-wrap items-center justify-between gap-2">
+          <Text className="font-mono text-base font-medium" selectable>
+            {item.code}
+          </Text>
+          <View
+            className={`rounded-full px-2 py-0.5 ${isActive ? 'bg-success-100 dark:bg-success-900/50' : expired ? 'bg-warning-100 dark:bg-warning-900/50' : 'bg-neutral-100 dark:bg-neutral-700/50'}`}
+          >
+            <Text
+              className={`text-xs font-medium ${isActive ? 'text-success-700 dark:text-success-300' : expired ? 'text-warning-700 dark:text-warning-300' : 'text-muted-foreground'}`}
+            >
+              {expired ? 'Expired' : item.status}
+            </Text>
+          </View>
+        </View>
+        {item.brand_name && (
+          <Text className="mt-1 text-sm text-muted-foreground">
+            {item.brand_name}
+          </Text>
+        )}
+        {item.video_url && (
+          <Text className="mt-1 text-xs text-muted-foreground" numberOfLines={1}>
+            {truncateUrl(item.video_url)}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior="padding"
       keyboardVerticalOffset={80}
     >
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
-        <Text className="mb-2 text-2xl font-bold">SparkCodes</Text>
-        <Text className="mb-4 text-muted-foreground">
-          Track Spark codes, video links, and brand status.
-        </Text>
-
-        <View className="mb-6">
-          <Text className="mb-2 text-lg font-semibold">Spark codes</Text>
-          {isLoading && (
-            <View className="py-8">
-              <ActivityIndicator size="small" />
-            </View>
+      {!isLoading && !error && codes.length > 0
+        ? (
+            <FlatList
+              className="flex-1"
+              contentContainerStyle={{ padding: 24 }}
+              data={codes}
+              keyExtractor={item => item.id}
+              removeClippedSubviews
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              ListHeaderComponent={listHeader}
+              ListFooterComponent={listFooter}
+              renderItem={renderItem}
+            />
+          )
+        : (
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+              {listHeader}
+              {listFooter}
+            </ScrollView>
           )}
-          {error && (
-            <View className="py-4">
-              <ListErrorBanner message={toHumanMessage(error)} retryHint="Pull to retry." />
-            </View>
-          )}
-          {!isLoading && !error && codes.length === 0 && (
-            <EmptyState message="No Spark codes yet. Add one below." />
-          )}
-          {!isLoading && !error && codes.length > 0 && (
-            <View className="gap-2">
-              {codes.map((item) => {
-                const expired = item.expires_at ? isExpired(item.expires_at) : false;
-                const isActive = item.status === 'active' && !expired;
-                return (
-                  <View
-                    key={item.id}
-                    className="rounded-2xl border border-neutral-200/80 bg-white/95 p-3 dark:border-neutral-600/50 dark:bg-neutral-800/95"
-                  >
-                    <View className="flex-row flex-wrap items-center justify-between gap-2">
-                      <Text className="font-mono text-base font-medium" selectable>
-                        {item.code}
-                      </Text>
-                      <View
-                        className={`rounded-full px-2 py-0.5 ${isActive ? 'bg-success-100 dark:bg-success-900/50' : expired ? 'bg-warning-100 dark:bg-warning-900/50' : 'bg-neutral-100 dark:bg-neutral-700/50'}`}
-                      >
-                        <Text
-                          className={`text-xs font-medium ${isActive ? 'text-success-700 dark:text-success-300' : expired ? 'text-warning-700 dark:text-warning-300' : 'text-muted-foreground'}`}
-                        >
-                          {expired ? 'Expired' : item.status}
-                        </Text>
-                      </View>
-                    </View>
-                    {item.brand_name && (
-                      <Text className="mt-1 text-sm text-muted-foreground">
-                        {item.brand_name}
-                      </Text>
-                    )}
-                    {item.video_url && (
-                      <Text className="mt-1 text-xs text-muted-foreground" numberOfLines={1}>
-                        {truncateUrl(item.video_url)}
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
-
-        <View className="mb-4">
-          <Text className="mb-2 text-lg font-semibold">Add Spark code</Text>
-          <form.Field
-            name="code"
-            children={field => (
-              <Input
-                label="Code"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChangeText={field.handleChange}
-                error={getFieldError(field)}
-                placeholder="Spark code"
-              />
-            )}
-          />
-          <form.Field
-            name="video_url"
-            children={field => (
-              <Input
-                label="Video URL (optional)"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChangeText={field.handleChange}
-                error={getFieldError(field)}
-                placeholder="https://..."
-              />
-            )}
-          />
-          <form.Field
-            name="brand_name"
-            children={field => (
-              <Input
-                label="Brand (optional)"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChangeText={field.handleChange}
-                error={getFieldError(field)}
-              />
-            )}
-          />
-          <form.Field
-            name="status"
-            children={field => (
-              <Select
-                label="Status"
-                options={SPARK_STATUS_OPTIONS}
-                value={field.state.value}
-                onSelect={v => field.handleChange(() => String(v) as 'draft' | 'sent_to_brand' | 'active' | 'expired')}
-                error={getFieldError(field)}
-                placeholder="Select status"
-              />
-            )}
-          />
-          <form.Field
-            name="expires_at"
-            children={field => (
-              <Input
-                label="Expires at (optional)"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChangeText={field.handleChange}
-                error={getFieldError(field)}
-                placeholder="YYYY-MM-DD or ISO"
-              />
-            )}
-          />
-          <form.Field
-            name="note"
-            children={field => (
-              <Input
-                label="Note (optional)"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChangeText={field.handleChange}
-                error={getFieldError(field)}
-              />
-            )}
-          />
-          <form.Subscribe
-            selector={state => [state.isSubmitting]}
-            children={([isSubmitting]) => (
-              <Button
-                label="Add Spark code"
-                variant="secondary"
-                onPress={form.handleSubmit}
-                loading={isSubmitting || mutation.isPending}
-              />
-            )}
-          />
-          {mutation.isError && !(mutation.error instanceof SupabaseNotConfiguredError) && !(mutation.error instanceof AuthRequiredError) && (
-            <Text className="mt-2 text-sm text-danger-600">
-              {toHumanMessage(mutation.error)}
-            </Text>
-          )}
-        </View>
-      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

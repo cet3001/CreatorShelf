@@ -4,15 +4,24 @@ import { createClient } from '@supabase/supabase-js';
 import Env from 'env';
 
 /**
- * Supabase client. Only created when EXPO_PUBLIC_SUPABASE_URL and
- * EXPO_PUBLIC_SUPABASE_ANON_KEY are set in .env (paste your project URL and
- * anon key from Supabase dashboard → Project Settings → API).
+ * Supabase client — lazy singleton.
+ *
+ * Uses getSupabaseClient() so the client is created on first use rather than
+ * at module load time. This prevents the client from being permanently null
+ * when the module is evaluated before env vars are available (e.g. during
+ * Metro hot reload or in certain bundler evaluation orders).
+ *
+ * Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env,
+ * then restart Metro: npx expo start -c
  */
-let supabase: SupabaseClient | null = null;
+let _supabase: SupabaseClient | null = null;
+let _initialized = false;
 
-function getSupabase(): SupabaseClient | null {
-  if (supabase !== null)
-    return supabase;
+export function getSupabaseClient(): SupabaseClient | null {
+  if (_initialized) {
+    return _supabase;
+  }
+  _initialized = true;
 
   const url = Env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
   const anonKey = Env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
@@ -27,12 +36,13 @@ function getSupabase(): SupabaseClient | null {
     return null;
   }
 
-  supabase = createClient(url, anonKey);
-  return supabase;
+  _supabase = createClient(url, anonKey);
+  return _supabase;
 }
-
-export const supabaseClient = getSupabase();
 
 export function isSupabaseConfigured(): boolean {
-  return supabaseClient !== null;
+  return getSupabaseClient() !== null;
 }
+
+/** @deprecated Use getSupabaseClient() instead. Kept for import compatibility. */
+export const supabaseClient = getSupabaseClient();

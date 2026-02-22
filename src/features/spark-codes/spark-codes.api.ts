@@ -3,7 +3,7 @@ import type { CreateSparkCodeInput, SparkCode } from '@/types/spark-codes';
 import { createMutation, createQuery } from 'react-query-kit';
 import { getCurrentUserId } from '@/features/auth/use-auth-store';
 import { AuthRequiredError } from '@/lib/auth';
-import { isSupabaseConfigured, supabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * SQL for spark_codes — run in Supabase SQL Editor.
@@ -44,6 +44,7 @@ export class SupabaseNotConfiguredError extends Error {
 }
 
 export async function listSparkCodes(): Promise<SparkCode[]> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     return [];
   }
@@ -70,6 +71,7 @@ export async function listSparkCodes(): Promise<SparkCode[]> {
 export async function createSparkCode(
   input: CreateSparkCodeInput,
 ): Promise<SparkCode> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new SupabaseNotConfiguredError();
   }
@@ -125,3 +127,26 @@ export const useCreateSparkCodeMutation = createMutation<
 >({
   mutationFn: variables => createSparkCode(variables),
 });
+
+/*
+ * Run this once in Supabase SQL editor to create the table if it doesn't exist.
+ *
+ * -- spark_codes
+ * create table if not exists public.spark_codes (
+ *   id uuid primary key default gen_random_uuid(),
+ *   user_id uuid not null,
+ *   code text not null,
+ *   video_url text,
+ *   brand_name text,
+ *   platform text,
+ *   status text not null default 'draft',
+ *   expires_at timestamptz,
+ *   note text,
+ *   created_at timestamptz not null default now()
+ * );
+ * alter table public.spark_codes enable row level security;
+ * create policy "Allow all for dev spark"
+ *   on public.spark_codes for all
+ *   using (true)
+ *   with check (true);
+ */

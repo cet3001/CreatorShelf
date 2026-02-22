@@ -3,7 +3,7 @@ import type { CalendarEvent, CreateCalendarEventInput } from '@/types/calendar';
 import { createMutation, createQuery } from 'react-query-kit';
 import { getCurrentUserId } from '@/features/auth/use-auth-store';
 import { AuthRequiredError } from '@/lib/auth';
-import { isSupabaseConfigured, supabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * SQL for calendar_events — run in Supabase SQL Editor.
@@ -58,6 +58,7 @@ function getUpcomingDateRange(): { from: string; to: string } {
 }
 
 export async function listCalendarEvents(): Promise<CalendarEvent[]> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     return [];
   }
@@ -88,6 +89,7 @@ export async function listCalendarEvents(): Promise<CalendarEvent[]> {
 export async function createCalendarEvent(
   input: CreateCalendarEventInput,
 ): Promise<CalendarEvent> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new SupabaseNotConfiguredError();
   }
@@ -143,3 +145,26 @@ export const useCreateCalendarEventMutation = createMutation<
 >({
   mutationFn: variables => createCalendarEvent(variables),
 });
+
+/*
+ * Run this once in Supabase SQL editor to create the table if it doesn't exist.
+ *
+ * -- calendar_events
+ * create table if not exists public.calendar_events (
+ *   id uuid primary key default gen_random_uuid(),
+ *   user_id uuid not null,
+ *   date date not null,
+ *   type text not null,
+ *   title text not null,
+ *   description text,
+ *   product_name text,
+ *   product_category text,
+ *   seasonal_key text,
+ *   created_at timestamptz not null default now()
+ * );
+ * alter table public.calendar_events enable row level security;
+ * create policy "Allow all for dev calendar"
+ *   on public.calendar_events for all
+ *   using (true)
+ *   with check (true);
+ */

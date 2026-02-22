@@ -3,7 +3,7 @@ import type { CreateIncomeEntryInput, IncomeEntry } from '@/types/income';
 import { createMutation, createQuery } from 'react-query-kit';
 import { getCurrentUserId } from '@/features/auth/use-auth-store';
 import { AuthRequiredError } from '@/lib/auth';
-import { isSupabaseConfigured, supabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * SQL for income_entries — run in Supabase SQL Editor.
@@ -72,6 +72,7 @@ export class SupabaseNotConfiguredError extends Error {
 }
 
 export async function listIncomeEntries(): Promise<IncomeEntry[]> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     return [];
   }
@@ -99,6 +100,7 @@ export async function listIncomeEntries(): Promise<IncomeEntry[]> {
 export async function createIncomeEntry(
   input: CreateIncomeEntryInput,
 ): Promise<IncomeEntry> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new SupabaseNotConfiguredError();
   }
@@ -155,3 +157,26 @@ export const useCreateIncomeEntryMutation = createMutation<
 >({
   mutationFn: variables => createIncomeEntry(variables),
 });
+
+/*
+ * Run this once in Supabase SQL editor to create the table if it doesn't exist.
+ *
+ * -- income_entries
+ * create table if not exists public.income_entries (
+ *   id uuid primary key default gen_random_uuid(),
+ *   user_id uuid not null,
+ *   date date not null,
+ *   amount numeric(12, 2) not null,
+ *   currency text not null default 'USD',
+ *   platform text not null,
+ *   product_name text,
+ *   brand_name text,
+ *   note text,
+ *   created_at timestamptz not null default now()
+ * );
+ * alter table public.income_entries enable row level security;
+ * create policy "Allow all for dev income"
+ *   on public.income_entries for all
+ *   using (true)
+ *   with check (true);
+ */

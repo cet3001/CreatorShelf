@@ -114,16 +114,21 @@
 @media (prefers-color-scheme: dark) {
   @theme {
     --color-background: #0F1214;
-    --color-foreground: #fafafa;
+    --color-foreground: #F2F4F6;
 
-    --color-card: #171717;
-    --color-card-foreground: #fafafa;
+    --color-card: #1A1D21;
+    --color-card-foreground: #F2F4F6;
+    --color-card-elevated: #22262B;
 
-    --color-muted: #262626;
-    --color-muted-foreground: #a3a3a3;
+    --color-muted: #22262B;
+    --color-muted-foreground: #9AA3AE;
 
-    --color-border: #404040;
-    --color-input: #404040;
+    --color-border: #2C3036;
+    --color-input: #2C3036;
+
+    --color-success-default: #10B981;
+    --color-warning-default: #F59E0B;
+    --color-error-default: #EF4444;
   }
 }
 

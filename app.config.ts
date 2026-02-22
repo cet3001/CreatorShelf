@@ -68,9 +68,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#0D9488',
-        image: './assets/splash-icon.png',
-        imageWidth: 150,
+        // Replace ./assets/images/splash.png with the actual CreatorShelf logo asset.
+        // Recommended: 1242×2688px PNG, logo centered, background #0F1214.
+        image: './assets/images/splash.png',
+        backgroundColor: '#0F1214',
+        resizeMode: 'contain',
+        ios: {
+          image: './assets/images/splash.png',
+          backgroundColor: '#0F1214',
+          resizeMode: 'contain',
+        },
+        android: {
+          image: './assets/images/splash.png',
+          backgroundColor: '#0F1214',
+          resizeMode: 'contain',
+        },
       },
     ],
     [
