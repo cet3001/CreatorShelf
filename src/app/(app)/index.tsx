@@ -7,6 +7,7 @@ import { useAuthStore } from '@/features/auth/use-auth-store';
 import { useCalendarEventsQuery } from '@/features/calendar/calendar.api';
 import { useContractsQuery } from '@/features/contracts/contracts.api';
 import { useIncomeEntriesQuery } from '@/features/income/income.api';
+import { useProfileQuery } from '@/features/profile/profile.api';
 import { useSparkCodesQuery } from '@/features/spark-codes/spark-codes.api';
 
 function getTodayISO(): string {
@@ -22,6 +23,7 @@ function sumByDate(entries: IncomeEntry[], fromDate: string, toDate: string): nu
 export default function DashboardScreen() {
   const user = useAuthStore.use.user();
   const status = useAuthStore.use.status();
+  const { data: profile } = useProfileQuery();
   const { data: incomeEntries = [], isLoading: incomeLoading } = useIncomeEntriesQuery();
   const { data: calendarEvents = [], isLoading: calendarLoading } = useCalendarEventsQuery();
   const { data: sparkCodes = [], isLoading: sparkLoading } = useSparkCodesQuery();
@@ -30,14 +32,18 @@ export default function DashboardScreen() {
   const isLoading = incomeLoading || calendarLoading || sparkLoading || contractsLoading;
   const activeSparkCount = sparkCodes.filter(c => c.status === 'active').length;
   const openContractsCount = contracts.filter(c => c.status !== 'paid').length;
+  const greeting = profile?.first_name
+    ? `Welcome back, ${profile.first_name}.`
+    : 'Welcome back.';
 
   const incomeSummary = useMemo(() => {
     const today = getTodayISO();
     const d = new Date();
     d.setDate(d.getDate() - 7);
     const sevenDaysAgo = d.toISOString().slice(0, 10);
-    d.setDate(d.getDate() - 23);
-    const thirtyDaysAgo = d.toISOString().slice(0, 10);
+    const d30 = new Date();
+    d30.setDate(d30.getDate() - 30);
+    const thirtyDaysAgo = d30.toISOString().slice(0, 10);
     return {
       today: sumByDate(incomeEntries, today, today),
       last7: sumByDate(incomeEntries, sevenDaysAgo, today),
@@ -50,8 +56,12 @@ export default function DashboardScreen() {
   const cardClass = 'rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95';
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
-      <Text className="mb-2 text-2xl font-bold">Dashboard</Text>
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ padding: 24 }}
+      scrollEventThrottle={16}
+    >
+      <Text className="mb-2 text-2xl font-bold">{greeting}</Text>
       <Text className="mb-6 text-muted-foreground">
         Today's income, upcoming promos, and deadlines.
       </Text>

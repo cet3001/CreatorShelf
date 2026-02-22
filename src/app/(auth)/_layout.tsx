@@ -1,4 +1,5 @@
 import { Redirect, Stack } from 'expo-router';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { useAuthStore } from '@/features/auth/use-auth-store';
 
@@ -8,6 +9,16 @@ export default function AuthLayout() {
 
   if (status === 'signIn' && user) {
     return <Redirect href="/(app)" />;
+  }
+
+  // Show visible loading state so we never render nothing while auth is resolving.
+  if (status === 'loading' || status === 'idle') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+        <ActivityIndicator size="large" />
+        <Text>Loading…</Text>
+      </View>
+    );
   }
 
   return (

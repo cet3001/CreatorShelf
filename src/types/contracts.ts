@@ -16,6 +16,7 @@ export type Contract = {
   due_date: string | null; // ISO date
   payment_due_date: string | null; // ISO date
   usage_rights_notes: string | null;
+  attachment_urls: string[];
   created_at: string; // ISO datetime
 };
 
@@ -46,6 +47,7 @@ export function getDefaultContractInput(
     due_date: null,
     payment_due_date: null,
     usage_rights_notes: null,
+    attachment_urls: [],
     ...overrides,
   };
 }

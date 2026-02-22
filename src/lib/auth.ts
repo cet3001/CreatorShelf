@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 
-import { isSupabaseConfigured, supabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 export class AuthRequiredError extends Error {
   constructor() {
@@ -13,6 +13,7 @@ export class AuthRequiredError extends Error {
  * Get the currently signed-in Supabase user, or null.
  */
 export async function getCurrentUser(): Promise<User | null> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     return null;
   }
@@ -24,12 +25,13 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 /**
- * Sign up with email and password. Returns the user on success.
+ * Sign up with email and password. Returns the user on success, or null if sign-up did not return a user.
  */
 export async function signUpWithEmail(
   email: string,
   password: string,
-): Promise<User> {
+): Promise<User | null> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new Error('Supabase is not configured.');
   }
@@ -37,10 +39,7 @@ export async function signUpWithEmail(
   if (error) {
     throw error;
   }
-  if (!data.user) {
-    throw new Error('Sign up did not return a user.');
-  }
-  return data.user;
+  return data.user ?? null;
 }
 
 /**
@@ -50,6 +49,7 @@ export async function signInWithEmail(
   email: string,
   password: string,
 ): Promise<User> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new Error('Supabase is not configured.');
   }
@@ -67,6 +67,7 @@ export async function signInWithEmail(
  * Sign out the current user.
  */
 export async function signOut(): Promise<void> {
+  const supabaseClient = getSupabaseClient();
   if (isSupabaseConfigured() && supabaseClient) {
     await supabaseClient.auth.signOut();
   }

@@ -3,10 +3,26 @@ import type { Contract, CreateContractInput } from '@/types/contracts';
 import { createMutation, createQuery } from 'react-query-kit';
 import { getCurrentUserId } from '@/features/auth/use-auth-store';
 import { AuthRequiredError } from '@/lib/auth';
-import { isSupabaseConfigured, supabaseClient } from '@/lib/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 /**
  * SQL for contracts — run in Supabase SQL Editor.
+ *
+ * --- Storage bucket for contract attachments ---
+ * insert into storage.buckets (id, name, public)
+ * values ('contract-attachments', 'contract-attachments', false);
+ *
+ * create policy "Users can upload own attachments"
+ *   on storage.objects for insert
+ *   with check (auth.uid()::text = (storage.foldername(name))[1]);
+ *
+ * create policy "Users can view own attachments"
+ *   on storage.objects for select
+ *   using (auth.uid()::text = (storage.foldername(name))[1]);
+ *
+ * --- Add attachment_urls column to contracts ---
+ * alter table public.contracts
+ *   add column if not exists attachment_urls text[] default '{}';
  *
  * --- OPTION A: Dev (no auth yet) ---
  *
@@ -49,6 +65,7 @@ export class SupabaseNotConfiguredError extends Error {
 }
 
 export async function listContracts(): Promise<Contract[]> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     return [];
   }
@@ -75,6 +92,7 @@ export async function listContracts(): Promise<Contract[]> {
 export async function createContract(
   input: CreateContractInput,
 ): Promise<Contract> {
+  const supabaseClient = getSupabaseClient();
   if (!isSupabaseConfigured() || !supabaseClient) {
     throw new SupabaseNotConfiguredError();
   }
@@ -98,6 +116,7 @@ export async function createContract(
     due_date: input.due_date ?? null,
     payment_due_date: input.payment_due_date ?? null,
     usage_rights_notes: input.usage_rights_notes ?? null,
+    attachment_urls: input.attachment_urls ?? [],
   };
 
   const { data, error } = await supabaseClient
@@ -111,6 +130,58 @@ export async function createContract(
   }
 
   return data as Contract;
+}
+
+const CONTRACT_ATTACHMENTS_BUCKET = 'contract-attachments';
+
+/**
+ * Upload files to contract-attachments bucket at {user_id}/{contract_id}/{filename}.
+ * Returns storage paths for each file (to store in contract.attachment_urls).
+ */
+export async function uploadContractAttachments(
+  userId: string,
+  contractId: string,
+  files: { uri: string; name: string }[],
+): Promise<string[]> {
+  const supabaseClient = getSupabaseClient();
+  if (!isSupabaseConfigured() || !supabaseClient) {
+    throw new SupabaseNotConfiguredError();
+  }
+
+  const paths: string[] = [];
+  for (const file of files) {
+    const fileName = file.name || `file-${Date.now()}`;
+    const path = `${userId}/${contractId}/${fileName}`;
+    const response = await fetch(file.uri);
+    const blob = await response.blob();
+    const { error } = await supabaseClient.storage
+      .from(CONTRACT_ATTACHMENTS_BUCKET)
+      .upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: true });
+    if (error) {
+      throw error;
+    }
+    paths.push(path);
+  }
+  return paths;
+}
+
+export async function updateContractAttachmentUrls(
+  contractId: string,
+  attachmentUrls: string[],
+): Promise<void> {
+  const supabaseClient = getSupabaseClient();
+  if (!isSupabaseConfigured() || !supabaseClient) {
+    throw new SupabaseNotConfiguredError();
+  }
+
+  const { error } = await supabaseClient
+    .from(CONTRACTS_TABLE)
+    .update({ attachment_urls: attachmentUrls })
+    .eq('id', contractId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 type ContractsResponse = Contract[];
@@ -135,3 +206,31 @@ export const useCreateContractMutation = createMutation<
 >({
   mutationFn: variables => createContract(variables),
 });
+
+/*
+ * Run this once in Supabase SQL editor to create the table if it doesn't exist.
+ *
+ * -- contracts
+ * create table if not exists public.contracts (
+ *   id uuid primary key default gen_random_uuid(),
+ *   user_id uuid not null,
+ *   brand_name text not null,
+ *   contact_name text,
+ *   contact_email text,
+ *   deliverables text,
+ *   platform text,
+ *   fee_amount numeric(12, 2),
+ *   currency text,
+ *   status text not null default 'draft',
+ *   start_date date,
+ *   due_date date,
+ *   payment_due_date date,
+ *   usage_rights_notes text,
+ *   created_at timestamptz not null default now()
+ * );
+ * alter table public.contracts enable row level security;
+ * create policy "Allow all for dev contracts"
+ *   on public.contracts for all
+ *   using (true)
+ *   with check (true);
+ */

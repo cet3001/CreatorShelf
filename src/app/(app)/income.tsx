@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   ScrollView,
+  SectionList,
 } from 'react-native';
 import * as z from 'zod';
 import {
@@ -131,8 +132,9 @@ export default function IncomeScreen() {
     const d = new Date();
     d.setDate(d.getDate() - 7);
     const sevenDaysAgo = d.toISOString().slice(0, 10);
-    d.setDate(d.getDate() - 23);
-    const thirtyDaysAgo = d.toISOString().slice(0, 10);
+    const d30 = new Date();
+    d30.setDate(d30.getDate() - 30);
+    const thirtyDaysAgo = d30.toISOString().slice(0, 10);
     return {
       today: sumByDate(entries, today, today),
       last7: sumByDate(entries, sevenDaysAgo, today),
@@ -140,7 +142,10 @@ export default function IncomeScreen() {
     };
   }, [entries]);
 
-  const grouped = useMemo(() => groupEntriesByDate(entries), [entries]);
+  const sections = useMemo(
+    () => groupEntriesByDate(entries).map(({ date, items }) => ({ title: date, data: items })),
+    [entries],
+  );
 
   if (!configured) {
     return (
@@ -154,95 +159,105 @@ export default function IncomeScreen() {
     );
   }
 
+  const cardClass = 'rounded-2xl border border-neutral-200/80 bg-white/95 p-3 dark:border-neutral-600/50 dark:bg-neutral-800/95';
+
+  const listHeader = (
+    <View className="mb-6">
+      <Text className="mb-2 text-2xl font-bold">Income</Text>
+      <Text className="mb-4 text-muted-foreground">
+        Daily/weekly/monthly income tracking and bestsellers.
+      </Text>
+      <View className="mb-6 flex-row gap-3">
+        <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
+          <Text className="text-2xl font-semibold tabular-nums">{summary.today.toFixed(2)}</Text>
+          <Text className="text-sm text-muted-foreground">Today</Text>
+        </View>
+        <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
+          <Text className="text-2xl font-semibold tabular-nums">{summary.last7.toFixed(2)}</Text>
+          <Text className="text-sm text-muted-foreground">Last 7 days</Text>
+        </View>
+        <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
+          <Text className="text-2xl font-semibold tabular-nums">{summary.last30.toFixed(2)}</Text>
+          <Text className="text-sm text-muted-foreground">Last 30 days</Text>
+        </View>
+      </View>
+      <Text className="mb-2 text-lg font-semibold">Recent entries</Text>
+      {isLoading && (
+        <View className="py-8">
+          <ActivityIndicator size="small" />
+        </View>
+      )}
+      {error && (
+        <View className="py-4">
+          <ListErrorBanner message={toHumanMessage(error)} retryHint="Pull to retry." />
+        </View>
+      )}
+      {!isLoading && !error && entries.length === 0 && (
+        <EmptyState message="No income entries yet. Tap Add income below." />
+      )}
+    </View>
+  );
+
+  const listFooter = (
+    <View className="pb-6">
+      <Button
+        label="Add income"
+        variant="secondary"
+        size="lg"
+        onPress={() => addIncomeModal.present()}
+        className="rounded-2xl"
+      />
+      {mutation.isError && !(mutation.error instanceof SupabaseNotConfiguredError) && !(mutation.error instanceof AuthRequiredError) && (
+        <Text className="mt-2 text-sm text-danger-600">
+          {toHumanMessage(mutation.error)}
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <>
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
-        <Text className="mb-2 text-2xl font-bold">Income</Text>
-        <Text className="mb-4 text-muted-foreground">
-          Daily/weekly/monthly income tracking and bestsellers.
-        </Text>
-
-        {/* Summary bar - glass style */}
-        <View className="mb-6 flex-row gap-3">
-          <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
-            <Text className="text-2xl font-semibold tabular-nums">{summary.today.toFixed(2)}</Text>
-            <Text className="text-sm text-muted-foreground">Today</Text>
-          </View>
-          <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
-            <Text className="text-2xl font-semibold tabular-nums">{summary.last7.toFixed(2)}</Text>
-            <Text className="text-sm text-muted-foreground">Last 7 days</Text>
-          </View>
-          <View className="flex-1 rounded-2xl border border-neutral-200/80 bg-white/95 p-4 dark:border-neutral-600/50 dark:bg-neutral-800/95">
-            <Text className="text-2xl font-semibold tabular-nums">{summary.last30.toFixed(2)}</Text>
-            <Text className="text-sm text-muted-foreground">Last 30 days</Text>
-          </View>
-        </View>
-
-        {/* List */}
-        <View className="mb-6">
-          <Text className="mb-2 text-lg font-semibold">Recent entries</Text>
-          {isLoading && (
-            <View className="py-8">
-              <ActivityIndicator size="small" />
-            </View>
-          )}
-          {error && (
-            <View className="py-4">
-              <ListErrorBanner message={toHumanMessage(error)} retryHint="Pull to retry." />
-            </View>
-          )}
-          {!isLoading && !error && entries.length === 0 && (
-            <EmptyState message="No income entries yet. Tap Add income below." />
-          )}
-          {!isLoading && !error && grouped.length > 0 && (
-            <View className="gap-3">
-              {grouped.map(({ date, items }) => (
-                <View key={date}>
-                  <Text className="mb-2 text-sm font-medium text-muted-foreground">{date}</Text>
-                  <View className="gap-2">
-                    {items.map(entry => (
-                      <View
-                        key={entry.id}
-                        className="rounded-2xl border border-neutral-200/80 bg-white/95 p-3 dark:border-neutral-600/50 dark:bg-neutral-800/95"
-                      >
-                        <View className="flex-row items-center justify-between">
-                          <Text className="font-medium tabular-nums">
-                            {entry.amount.toFixed(2)}
-                            {' '}
-                            {entry.currency}
-                          </Text>
-                          <Text className="text-sm text-muted-foreground">
-                            {entry.platform}
-                          </Text>
-                        </View>
-                        {(entry.product_name ?? entry.brand_name) && (
-                          <Text className="mt-1 text-sm text-muted-foreground">
-                            {[entry.product_name, entry.brand_name].filter(Boolean).join(' · ')}
-                          </Text>
-                        )}
-                      </View>
-                    ))}
+      {!isLoading && !error && sections.length > 0
+        ? (
+            <SectionList
+              className="flex-1"
+              contentContainerStyle={{ padding: 24 }}
+              sections={sections}
+              keyExtractor={item => item.id}
+              removeClippedSubviews
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              ListHeaderComponent={listHeader}
+              ListFooterComponent={listFooter}
+              renderSectionHeader={({ section: { title } }) => (
+                <Text className="my-2 text-sm font-medium text-muted-foreground">{title}</Text>
+              )}
+              renderItem={({ item: entry }) => (
+                <View className={`mb-2 ${cardClass}`}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="font-medium tabular-nums">
+                      {entry.amount.toFixed(2)}
+                      {' '}
+                      {entry.currency}
+                    </Text>
+                    <Text className="text-sm text-muted-foreground">{entry.platform}</Text>
                   </View>
+                  {(entry.product_name ?? entry.brand_name) && (
+                    <Text className="mt-1 text-sm text-muted-foreground">
+                      {[entry.product_name, entry.brand_name].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
                 </View>
-              ))}
-            </View>
+              )}
+              stickySectionHeadersEnabled={false}
+            />
+          )
+        : (
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+              {listHeader}
+              {listFooter}
+            </ScrollView>
           )}
-        </View>
-
-        {/* Primary action: Add income - opens bottom sheet */}
-        <Button
-          label="Add income"
-          variant="secondary"
-          size="lg"
-          onPress={() => addIncomeModal.present()}
-          className="rounded-2xl"
-        />
-        {mutation.isError && !(mutation.error instanceof SupabaseNotConfiguredError) && !(mutation.error instanceof AuthRequiredError) && (
-          <Text className="mt-2 text-sm text-danger-600">
-            {toHumanMessage(mutation.error)}
-          </Text>
-        )}
-      </ScrollView>
 
       {/* Add income bottom sheet */}
       <Modal
