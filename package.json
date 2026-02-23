@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "expo-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
@@ -63,7 +62,6 @@
   },
   "private": true
 }
-=======
   "name": "creatorshelf",
   "version": "0.0.1",
   "private": true,
@@ -223,4 +221,3 @@
     "initVersion": "9.0.0"
   }
 }
->>>>>>> main
